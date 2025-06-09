@@ -7,6 +7,17 @@ For more information read my introductory article
 [here](https://www.yaroslavps.com/weblog/genl-intro/); or if you are the
 adventurous kind just read the source, it's got plenty of comments :)
 
+
+## Dependencies
+
+```sh
+sudo apt-get update
+sudo apt-get install make gcc
+sudo apt-get install libnl-3-dev libnl-genl-3-dev
+sudo apt install pkgconf
+```
+
+
 ## Build and run
 
 ### Kernel module
