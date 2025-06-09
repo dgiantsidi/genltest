@@ -1,28 +1,25 @@
-#include <stdlib.h>
+#include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
 
-#include <sys/socket.h>
 #include <linux/netlink.h>
+#include <sys/socket.h>
 
-#define MAX_PAYLOAD 1024  /* maximum payload size */
+#define MAX_PAYLOAD 1024 /* maximum payload size */
 #define NETLINK_TEST 17
-
 
 static char message[MAX_PAYLOAD];
 
-static char* get_message(void)
-{  
+static char *get_message(void) {
   static int counter = 0; // static to retain value between calls
   snprintf(message, MAX_PAYLOAD, "%d", counter);
   counter++;
   return message;
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   struct sockaddr_nl src_addr;
   struct sockaddr_nl dest_addr;
   struct nlmsghdr *nlh;
@@ -44,26 +41,24 @@ int main(int argc, char **argv)
 
   memset(&src_addr, 0, sizeof(src_addr));
   src_addr.nl_family = AF_NETLINK;
-  src_addr.nl_pid = getpid();  /* self pid */
-  src_addr.nl_groups = 0;  /* not in mcast groups */
-  bind(sock_fd, (struct sockaddr*)&src_addr, sizeof(src_addr));
+  src_addr.nl_pid = getpid(); /* self pid */
+  src_addr.nl_groups = 0;     /* not in mcast groups */
+  bind(sock_fd, (struct sockaddr *)&src_addr, sizeof(src_addr));
 
-
-
-   for (;;) {
+  for (;;) {
     memset(&dest_addr, 0, sizeof(dest_addr));
     dest_addr.nl_family = AF_NETLINK;
-    dest_addr.nl_pid = 0;   /* For Linux Kernel */
+    dest_addr.nl_pid = 0;    /* For Linux Kernel */
     dest_addr.nl_groups = 0; /* unicast */
 
     nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
 
     /* Fill the netlink message header */
     nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
-    nlh->nlmsg_pid = getpid();  /* self pid */
+    nlh->nlmsg_pid = getpid(); /* self pid */
     nlh->nlmsg_flags = 0;
 
-    char* my_msg = get_message();
+    char *my_msg = get_message();
     /* Fill in the netlink message payload */
     strcpy(NLMSG_DATA(nlh), my_msg);
 
@@ -81,9 +76,9 @@ int main(int argc, char **argv)
 
     rc = sendmsg(sock_fd, &msg, 0);
     if (rc < 0) {
-        printf("sendmsg(): %s\n", strerror(errno));
-        close(sock_fd);
-        return 1;
+      printf("sendmsg(): %s\n", strerror(errno));
+      close(sock_fd);
+      return 1;
     }
 
     /* Read message from kernel */
@@ -91,14 +86,14 @@ int main(int argc, char **argv)
 
     rc = recvmsg(sock_fd, &msg, 0);
     if (rc < 0) {
-        printf("sendmsg(): %s\n", strerror(errno));
-        close(sock_fd);
-        return 1;
+      printf("sendmsg(): %s\n", strerror(errno));
+      close(sock_fd);
+      return 1;
     }
 
     printf("Received from kernel: %s\n", NLMSG_DATA(nlh));
     free(nlh);
-    }
+  }
   /* Close Netlink Socket */
   close(sock_fd);
 
