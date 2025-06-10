@@ -21,6 +21,7 @@ make
 ```
 
 ```sh
+sudo rmmod netlink_test
 sudo insmod netlink_test.ko
 ```
 
@@ -31,7 +32,10 @@ sudo insmod netlink_test.ko
 ## Results (10/06/2025)
 
 ```sh
-Elapsed time: 41999067380  nanoseconds (latency per operation = 4.199907 us)
-
-Elapsed time: 57239364691  nanoseconds (latency per operation = 5.723936 us)
+Elapsed time: 80698039659  nanoseconds (latency per operation = 8.069804 us), msg_size=1023
+Elapsed time: 51167878468  nanoseconds (latency per operation = 5.116788 us), msg_size=255
+Elapsed time: 49612394604  nanoseconds (latency per operation = 4.961239 us), msg_size=255
+Elapsed time: 45159785744  nanoseconds (latency per operation = 4.515979 us), msg_size=127
+Elapsed time: 46151852832  nanoseconds (latency per operation = 4.615185 us), msg_size=127
+Elapsed time: 42880586188  nanoseconds (latency per operation = 4.288059 us), msg_size=63
 ```
