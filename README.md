@@ -27,3 +27,9 @@ sudo insmod netlink_test.ko
 ```sh
 ./nl_recv
 ```
+
+## Results (10/06/2025)
+
+```sh
+Elapsed time: 41999067380  nanoseconds (latency per operation = 4.199907 us)
+```
