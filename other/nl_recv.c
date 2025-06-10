@@ -4,16 +4,19 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <time.h>
+
 #include <linux/netlink.h>
 #include <sys/socket.h>
 
 #define MAX_PAYLOAD 1024 /* maximum payload size */
 #define NETLINK_TEST 17
+#define TOTAL_OPS 10000000
 
 static char message[MAX_PAYLOAD];
+static int counter = 0; // static to retain value between calls
 
 static char *get_message(void) {
-  static int counter = 0; // static to retain value between calls
   snprintf(message, MAX_PAYLOAD, "%d", counter);
   counter++;
   return message;
@@ -44,8 +47,19 @@ int main(int argc, char **argv) {
   src_addr.nl_pid = getpid(); /* self pid */
   src_addr.nl_groups = 0;     /* not in mcast groups */
   bind(sock_fd, (struct sockaddr *)&src_addr, sizeof(src_addr));
+  
+
+
+  struct timespec start, end;
+  long long  elapsed_ns;
+
+  // Get start time
+  clock_gettime(CLOCK_MONOTONIC, &start);
 
   for (;;) {
+    if (counter == TOTAL_OPS) {
+      break; 
+    }
     memset(&dest_addr, 0, sizeof(dest_addr));
     dest_addr.nl_family = AF_NETLINK;
     dest_addr.nl_pid = 0;    /* For Linux Kernel */
@@ -72,7 +86,7 @@ int main(int argc, char **argv) {
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
 
-    printf("Send to kernel: %s\n", my_msg);
+    //printf("Send to kernel: %s\n", my_msg);
 
     rc = sendmsg(sock_fd, &msg, 0);
     if (rc < 0) {
@@ -90,10 +104,22 @@ int main(int argc, char **argv) {
       close(sock_fd);
       return 1;
     }
-
-    printf("Received from kernel: %s\n", NLMSG_DATA(nlh));
+    if (memcmp(NLMSG_DATA(nlh), my_msg, strlen(my_msg)) != 0) {
+      printf("Received message does not match sent message.\n");
+      return 1;
+    }
+    // printf("Received from kernel: %s\n", NLMSG_DATA(nlh));
     free(nlh);
   }
+  
+  // Get end time
+  clock_gettime(CLOCK_MONOTONIC, &end);
+
+  // Calculate elapsed time in seconds
+  elapsed_ns = (end.tv_sec - start.tv_sec)*1e9 + (end.tv_nsec - start.tv_nsec);
+  double latency_us = (elapsed_ns/1e3) / TOTAL_OPS; // Convert to microseconds 
+  printf("Elapsed time: %llu  nanoseconds (latency per operation = %f us)\n", elapsed_ns, latency_us);
+
   /* Close Netlink Socket */
   close(sock_fd);
 

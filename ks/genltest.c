@@ -25,13 +25,14 @@
 
 /* Forward declaration */
 static struct genl_family genl_fam;
-
+static int counter = 0;
 /* Handler for GENLTEST_CMD_ECHO messages received */
 static int echo_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	int		ret = 0;
 	void	       *hdr;
 	struct sk_buff *msg;
+	pr_info("%s\n", __func__);
 
 	/* Check if the attribute is present and print it */
 	if (info->attrs[GENLTEST_A_MSG]) {
@@ -48,6 +49,9 @@ static int echo_doit(struct sk_buff *skb, struct genl_info *info)
 		return -ENOMEM;
 	}
 
+	pr_info("allocated %d bytes for reply\ngeneric link header: info->snd_portid=%d,\
+		info->snd_seq=%d\n", NLMSG_DEFAULT_SIZE, info->snd_portid, info->snd_seq);
+
 	/* Put the Generic Netlink header */
 	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq, &genl_fam, 0,
 			  GENLTEST_CMD_ECHO);
@@ -56,9 +60,13 @@ static int echo_doit(struct sk_buff *skb, struct genl_info *info)
 		nlmsg_free(msg);
 		return -EMSGSIZE;
 	}
+	
+	#define msg_sz 256
+	char my_buf[msg_sz];
+	snprintf(my_buf, msg_sz, "Hello from Kernel Space, Netlink%d", counter);
+	counter++;
 	/* And the message */
-	if ((ret = nla_put_string(msg, GENLTEST_A_MSG,
-				  "Hello from Kernel Space, Netlink!"))) {
+	if ((ret = nla_put_string(msg, GENLTEST_A_MSG, my_buf))) {
 		pr_err("failed to create message string\n");
 		genlmsg_cancel(msg, hdr);
 		nlmsg_free(msg);
@@ -69,7 +77,7 @@ static int echo_doit(struct sk_buff *skb, struct genl_info *info)
 	genlmsg_end(msg, hdr);
 
 	ret = genlmsg_reply(msg, info);
-	pr_info("reply sent\n");
+	pr_info("thread_id=%d reply sent %s\n", get_current()->pid, my_buf);
 
 out:
 	return ret;
@@ -89,7 +97,7 @@ static struct genl_ops genl_ops[] = {
 	 },
 };
 
-/* Multicast groups for our family */
+/* Multicast groups for our family  */
 static const struct genl_multicast_group genl_mcgrps[] = {
 	{ .name = GENLTEST_MC_GRP_NAME },
 };
@@ -150,13 +158,16 @@ static int echo_ping(const char *buf, size_t cnt)
 	return ret;
 }
 
+
 /*
  * Test sysfs attr to send multicast messages. The string in the buffer will be 
  * echoed to the multicast group.
- */
+*/
 static ssize_t ping_store(struct kobject *kobj, struct kobj_attribute *attr,
 			  const char *buf, size_t cnt)
 {
+	pr_info("%s\n", __func__);
+
 	int max = cnt > MSG_MAX_LEN ? MSG_MAX_LEN : cnt;
 	echo_ping(buf, max);
 

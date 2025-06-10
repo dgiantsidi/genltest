@@ -1,6 +1,6 @@
 KERNEL_DIR=/usr/src/kernel-headers-$(shell uname -r)
 obj-m += netlink_test.o
-ccflags-y := -std=gnu99 -Wno-declaration-after-statement
+ccflags-y := -std=gnu99 -O3 -Wno-declaration-after-statement
 
 all:
 	$(CC) nl_recv.c -o nl_recv
