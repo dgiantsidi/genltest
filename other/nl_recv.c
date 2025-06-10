@@ -15,9 +15,14 @@
 
 static char message[MAX_PAYLOAD];
 static int counter = 0; // static to retain value between calls
+static int current_msg_size = MAX_PAYLOAD;
 
 static char *get_message(void) {
-  snprintf(message, MAX_PAYLOAD, "%d", counter);
+  char tmp_message[MAX_PAYLOAD];
+  memset(tmp_message, '1', MAX_PAYLOAD);
+  memcpy(message, tmp_message, current_msg_size);
+  message[current_msg_size - 1] = '\0'; 
+  //printf(message, MAX_PAYLOAD, "%d", counter);
   counter++;
   return message;
 }
@@ -28,15 +33,17 @@ int main(int argc, char **argv) {
   struct nlmsghdr *nlh;
   struct msghdr msg;
   struct iovec iov;
-  int sock_fd;
   int rc;
 
-  if (argc != 2) {
-    printf("usage: %s <message>\n", argv[0]);
-    return 1;
+  if (argc > 1) {
+    current_msg_size = atoi(argv[1]);
+    if (current_msg_size <= 0 || current_msg_size > MAX_PAYLOAD) {
+      fprintf(stderr, "Invalid message size. Using default %d bytes.\n", MAX_PAYLOAD);
+      current_msg_size = MAX_PAYLOAD;
+    }
   }
-
-  sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TEST);
+  
+  int sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TEST);
   if (sock_fd < 0) {
     printf("socket: %s\n", strerror(errno));
     return 1;
@@ -48,14 +55,12 @@ int main(int argc, char **argv) {
   src_addr.nl_groups = 0;     /* not in mcast groups */
   bind(sock_fd, (struct sockaddr *)&src_addr, sizeof(src_addr));
   
-
-
   struct timespec start, end;
   long long  elapsed_ns;
 
   // Get start time
   clock_gettime(CLOCK_MONOTONIC, &start);
-
+  char *my_msg;
   for (;;) {
     if (counter == TOTAL_OPS) {
       break; 
@@ -72,7 +77,7 @@ int main(int argc, char **argv) {
     nlh->nlmsg_pid = getpid(); /* self pid */
     nlh->nlmsg_flags = 0;
 
-    char *my_msg = get_message();
+    my_msg = get_message();
     /* Fill in the netlink message payload */
     strcpy(NLMSG_DATA(nlh), my_msg);
 
@@ -118,7 +123,7 @@ int main(int argc, char **argv) {
   // Calculate elapsed time in seconds
   elapsed_ns = (end.tv_sec - start.tv_sec)*1e9 + (end.tv_nsec - start.tv_nsec);
   double latency_us = (elapsed_ns/1e3) / TOTAL_OPS; // Convert to microseconds 
-  printf("Elapsed time: %llu  nanoseconds (latency per operation = %f us)\n", elapsed_ns, latency_us);
+  printf("Elapsed time: %llu  nanoseconds (latency per operation = %f us), msg_size=%lu\n", elapsed_ns, latency_us, strlen(my_msg));
 
   /* Close Netlink Socket */
   close(sock_fd);

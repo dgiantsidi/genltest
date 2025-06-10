@@ -19,6 +19,10 @@ static void netlink_test_recv_msg(struct sk_buff *skb) {
   pid = nlh->nlmsg_pid; /* pid of sending process */
   msg = (char *)nlmsg_data(nlh);
   msg_size = strlen(msg);
+  //if (msg_size != 1024 && msg_size != 1023) {
+  //  printk(KERN_ERR "netlink_test: Received message size is not 1024 bytes msg=%d\n", msg_size);
+    //return;
+  //}
 
   // printk(KERN_INFO "netlink_test: Received from pid %d: %s\n", pid, msg);
 
