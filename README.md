@@ -32,4 +32,6 @@ sudo insmod netlink_test.ko
 
 ```sh
 Elapsed time: 41999067380  nanoseconds (latency per operation = 4.199907 us)
+
+Elapsed time: 57239364691  nanoseconds (latency per operation = 5.723936 us)
 ```
