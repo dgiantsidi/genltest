@@ -4,7 +4,8 @@
 #include <net/sock.h>
 
 #define NETLINK_TEST 17
-static struct task_struct kth_arr[1];
+static struct task_struct *kth_arr;
+int thread_id = 0;
 
 struct sock *nl_sock = NULL;
 
@@ -20,12 +21,14 @@ static void netlink_test_recv_msg(struct sk_buff *skb) {
   pid = nlh->nlmsg_pid; /* pid of sending process */
   msg = (char *)nlmsg_data(nlh);
   msg_size = strlen(msg);
-  //if (msg_size != 1024 && msg_size != 1023) {
-  //  printk(KERN_ERR "netlink_test: Received message size is not 1024 bytes msg=%d\n", msg_size);
-    //return;
+  // if (msg_size != 1024 && msg_size != 1023) {
+  //   printk(KERN_ERR "netlink_test: Received message size is not 1024 bytes
+  //   msg=%d\n", msg_size);
+  // return;
   //}
 
-  // printk(KERN_INFO "netlink_test: Received from pid %d: %s\n", pid, msg);
+  // printk(KERN_INFO "netlink_test: Received from pid %d: [thread_id:%d]\n",
+  // pid, current->pid);
 
   // create reply
   skb_out = nlmsg_new(msg_size, 0);
@@ -46,40 +49,48 @@ static void netlink_test_recv_msg(struct sk_buff *skb) {
     printk(KERN_INFO "netlink_test: Error while sending skb to user\n");
 }
 
-// long running function to be executed inside a thread, this will run for 30 secs. 
-int thread_function(void * idx) {
-  unsigned int i = 0;
-  int t_id = * ((int *)idx);
+// long running function to be executed inside a thread, this will run for 30
+// secs.
+static int thread_function(void *idx) {
+  printk(KERN_INFO "thread %d started [thread_id=%d]\n", thread_id,
+         (kth_arr)->pid);
 
   // kthread_should_stop call is important.
   while (!kthread_should_stop()) {
-    printk(KERN_INFO "Thread %d Still running...! %d secs\n", t_id, i);
-    i++;
-    // if (i == 30)
-    //  break;
+    // printk(KERN_INFO "Thread %d Still running...! %d secs\n", t_id, i);
+    // i++;
+
     msleep(1000);
   }
-  printk(KERN_INFO "thread %d stopped\n", t_id);
-  return 0;
+
+  printk(KERN_INFO "thread %d stopped\n", thread_id);
+  netlink_kernel_release(nl_sock);
+
+  return 100;
 }
 
 // initialize one thread at a time.
-int initialize_thread(struct task_struct * kth, int idx) {
+static int initialize_thread(void) {
+
   char th_name[20];
-  sprintf(th_name, "kthread_%d", idx);
-  kth = kthread_create(thread_function, &idx, (const char * ) th_name);
-  if (kth != NULL) {
-    wake_up_process(kth);
+  sprintf(th_name, "kthread_%d", thread_id);
+  kth_arr = kthread_create(thread_function, NULL, (const char *)th_name);
+  if ((kth_arr) != NULL) {
+    wake_up_process(kth_arr);
     printk(KERN_INFO "%s is running\n", th_name);
   } else {
     printk(KERN_INFO "kthread %s could not be created\n", th_name);
     return -1;
   }
+
   return 0;
 }
 
 static int __init netlink_test_init(void) {
-  printk(KERN_INFO "netlink_test: Init module\n");
+  printk(KERN_INFO "netlink_test: Init module %d\n", current->pid);
+  if (initialize_thread() == -1) {
+    return -1;
+  }
 
   struct netlink_kernel_cfg cfg = {
       .input = netlink_test_recv_msg,
@@ -90,12 +101,6 @@ static int __init netlink_test_init(void) {
     printk(KERN_ALERT "netlink_test: Error creating socket.\n");
     return -10;
   }
-  printk(KERN_INFO "Initializing thread module\n");
-  
-	
-  if (initialize_thread(&kth_arr[0], 0) == -1) {
-    return -1;
-  }
 
   return 0;
 }
@@ -103,14 +108,13 @@ static int __init netlink_test_init(void) {
 static void __exit netlink_test_exit(void) {
   printk(KERN_INFO "netlink_test: Exit module\n");
   printk(KERN_INFO "exiting thread module\n");
- 
-	// stop all of the threads before removing the module.
-  int ret = kthread_stop(&kth_arr[0]);
-  if (!ret) {
-    printk("can't stop thread %d", 0);
-  }
-  printk(KERN_INFO "stopped all of the threads\n");
-  netlink_kernel_release(nl_sock);
+
+  // stop all of the threads before removing the module.
+  int ret = kthread_stop(kth_arr);
+
+  printk("thread returns %d", ret);
+
+  printk(KERN_INFO "stopped the threads\n");
 }
 
 module_init(netlink_test_init);
