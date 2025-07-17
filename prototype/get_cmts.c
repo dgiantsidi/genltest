@@ -9,9 +9,7 @@
 #include <linux/netlink.h>
 #include <sys/socket.h>
 
-#define MAX_PAYLOAD 1024 /* maximum payload size */
-#define NETLINK_TEST 17
-#define TOTAL_OPS 10000000
+#include "msg_processing_functions.h"
 
 static char message[MAX_PAYLOAD];
 static int counter = 0; // static to retain value between calls
@@ -92,7 +90,7 @@ int main(int argc, char **argv) {
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
 
-    printf("Send to kernel: %s\n", my_msg);
+    //printf("Send to kernel: %s\n", my_msg);
 
     rc = sendmsg(sock_fd, &msg, 0);
     if (rc < 0) {
