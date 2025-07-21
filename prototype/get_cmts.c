@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-    recv_cmt_msg_t* recv_msg = deserialze_recv_cmt(NLMSG_DATA(nlh));
+    recv_cmt_msg_t* recv_msg = deserialize_recv_cmt(NLMSG_DATA(nlh));
 
     printf("received from kernel: {blk_id=%ld, %s, cmt=%s}\n", \
       recv_msg->blk_id, recv_msg->poolname, recv_msg->tail_commitment);

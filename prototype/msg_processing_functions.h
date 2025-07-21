@@ -28,7 +28,9 @@ static char* serialize_get_cmt_into_char(const char* poolname) {
   return serialized_msg;
 }
 
-static recv_cmt_msg_t* deserialze_recv_cmt(const char* msg) {
+
+
+static recv_cmt_msg_t* deserialize_recv_cmt(const char* msg) {
   recv_cmt_msg_t * recv_msg = (recv_cmt_msg_t*) malloc(sizeof(recv_cmt_msg_t));
   memcpy(&(recv_msg->blk_id), msg, sizeof(recv_msg->blk_id));
   memcpy(&(recv_msg->poolname), msg + sizeof(recv_msg->blk_id), \
@@ -37,3 +39,4 @@ static recv_cmt_msg_t* deserialze_recv_cmt(const char* msg) {
     COMMITMENT_SIZE);
   return recv_msg;
 }
+

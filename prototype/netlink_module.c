@@ -5,12 +5,26 @@
 #include "config.h"
 
 
-
 int thread_id = 0;
 
 struct sock *nl_sock_get_cmts = NULL;
 struct sock *nl_sock_notify = NULL;
 
+static char* serialize_recv_cmt(char* recv_msg, \
+  const char* poolname, uint64_t blk_id, \
+  const char* tail_commitment) {
+
+  memcpy(recv_msg, &(blk_id), sizeof(blk_id));
+  memcpy(recv_msg+sizeof(blk_id), poolname, \
+    ZFS_MAX_DATASET_NAME_LEN);
+  memcpy(recv_msg+sizeof(blk_id)+ZFS_MAX_DATASET_NAME_LEN, tail_commitment, \
+    COMMITMENT_SIZE);
+  return recv_msg;
+}
+
+static int get_size_of_recv_cmt(void) {
+  return sizeof(recv_cmt_msg_t);
+}
 
 static void notify_cmts(struct sk_buff *skb) {
   struct nlmsghdr* nlh = (struct nlmsghdr *)skb->data;
@@ -30,8 +44,8 @@ static void get_cmts(struct sk_buff *skb) {
   
   struct nlmsghdr* nlh = (struct nlmsghdr *)skb->data;
   int pid = nlh->nlmsg_pid; /* pid of sending process */
-  char* msg = (char*) nlmsg_data(nlh);
-  int msg_size = nlh->nlmsg_len;
+  char* msg = (char*) nlmsg_data(nlh); // it is of type get_cmt_msg_t
+  int msg_size = nlh->nlmsg_len-NLMSG_HDRLEN;
  
   // create reply
   skb_out = nlmsg_new(msg_size, 0);
@@ -43,7 +57,8 @@ static void get_cmts(struct sk_buff *skb) {
   // put received message into reply
   nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
   NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
-  strncpy(nlmsg_data(nlh), msg, msg_size);
+  char* to_be_copied = serialize_recv_cmt(nlmsg_data(nlh), msg, 10, msg);
+  memcpy(nlmsg_data(nlh), to_be_copied, get_size_of_recv_cmt());
 
   printk(KERN_INFO "get_cmts: send %s\n", msg);
 
