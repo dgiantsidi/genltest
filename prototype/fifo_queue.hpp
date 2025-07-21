@@ -22,6 +22,11 @@ class fifo_queue {
             queue.push(msg);
         }
 
+        bool empty() {
+            std::lock_guard<std::mutex> lock(mtx);
+            return queue.empty();
+        }
+
         T pop() {
             std::lock_guard<std::mutex> lock(mtx);
             if (!queue.empty()) {

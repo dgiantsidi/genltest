@@ -11,8 +11,10 @@
 #include "config_c.h"
 #include "msg_processing_functions.h"
 #include "fifo_queue.hpp"
+#include <atomic>
 
 fifo_queue<recv_cmt_msg_t*> recv_queue; // queue to store received messages
+std::atomic<int> get_thread_done(false);  
 
 static void* notify_cmts(void* arg_poolname) {
   struct sockaddr_nl src_addr, dest_addr;
@@ -43,9 +45,10 @@ static void* notify_cmts(void* arg_poolname) {
   // get start time
   clock_gettime(CLOCK_MONOTONIC, &start);
   for (;;) {
-    if (counter == c_total_ops) {
+    if (get_thread_done.load() && recv_queue.empty()) {
       break;
     }
+
     memset(&dest_addr, 0, sizeof(dest_addr));
     dest_addr.nl_family = AF_NETLINK;
     dest_addr.nl_pid = 0;    /* For Linux Kernel */
@@ -58,7 +61,12 @@ static void* notify_cmts(void* arg_poolname) {
     nlh->nlmsg_pid = getpid(); /* self pid */
     nlh->nlmsg_flags = 0;
 
+    randomized_sleeps();
     recv_cmt_msg_t* last_cmt = recv_queue.pop();
+    while (last_cmt == nullptr) {
+      last_cmt = recv_queue.pop();
+    }
+      
     char* tx_msg = serialize_notify_cmt_into_char(last_cmt->poolname, last_cmt->blk_id);
     uint64_t last_blk_id = last_cmt->blk_id;
     free(last_cmt); 
@@ -90,7 +98,9 @@ static void* notify_cmts(void* arg_poolname) {
     free(nlh);
     free(tx_msg);
     std::vector<recv_cmt_msg_t*> to_be_deleted = recv_queue.pop_until_blk_id(last_blk_id);
-    counter++;
+    for (auto& buf : to_be_deleted) {
+      free(buf); // free the messages that were popped from the queue
+    }
   }
 
   // get end time
@@ -113,6 +123,7 @@ static size_t max_buffer_size() {
   return (sizeof(get_cmt_msg_t) > sizeof(recv_cmt_msg_t))? \
     sizeof(get_cmt_msg_t) : sizeof(recv_cmt_msg_t);
 }
+
 
 
 
@@ -248,6 +259,7 @@ int main(int argc, char **argv) {
 
     // wait for both threads to finish
     pthread_join(get_cmts_thread, NULL);
+    get_thread_done.store(true);
     pthread_join(notify_cmts_thread, NULL);
 
     printf("both threads have completed.\n");

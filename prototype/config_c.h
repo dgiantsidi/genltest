@@ -10,6 +10,12 @@
 #include "config.h"
 
 
+static void randomized_sleeps() {
+    // sleep for a random time between 0 and 100 microseconds
+    int sleep_time = rand() % 100; // in microseconds
+    usleep(sleep_time);
+}
+
 // ---- helpers ----
 
 static const char* get_socket_type(const int socket_type) {
