@@ -2,15 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
 #include <stdint.h>
-
 #include <time.h>
-
 #include <linux/netlink.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include "config.h"
+#include "config_c.h"
 #include "msg_processing_functions.h"
 
 static uint64_t c_total_ops = 1e6;
@@ -88,9 +85,9 @@ int main(int argc, char **argv) {
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
 
-    int blk_id = 0;
-    memcpy(&blk_id, tx_msg, sizeof(int));
-    printf("Send to kernel: %d, size=%d\n", blk_id, nlh->nlmsg_len);
+    uint64_t blk_id = 0;
+    memcpy(&blk_id, tx_msg, sizeof(uint64_t));
+    printf("send to kernel: {%ld, %dB}\n", blk_id, nlh->nlmsg_len);
 
     rc = sendmsg(sock_fd, &msg, 0);
     if (rc < 0) {
@@ -110,7 +107,7 @@ int main(int argc, char **argv) {
   // calculate elapsed time in seconds
   long long elapsed_ns =
       (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
-  double latency_us = (elapsed_ns / 1e3) / c_total_ops; // Convert to microseconds
+  double latency_us = (elapsed_ns / 1e3) / c_total_ops; // convert to microseconds
   printf("elapsed time: %llu  nanoseconds (latency per operation = %f us), "
          "msg_size=%lu\n",
          elapsed_ns, latency_us, sizeof(notify_cmt_msg_t));

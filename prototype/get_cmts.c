@@ -3,26 +3,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
+#include <stdint.h>
 #include <time.h>
-
 #include <linux/netlink.h>
 #include <sys/socket.h>
+#include "config_c.h"
 
 #include "msg_processing_functions.h"
 
-static char message[MAX_PAYLOAD];
-static int counter = 0; // static to retain value between calls
-static int current_msg_size = MAX_PAYLOAD;
 
-static char *get_message(void) {
-  char tmp_message[MAX_PAYLOAD];
-  memset(tmp_message, '1', MAX_PAYLOAD);
-  memcpy(message, tmp_message, current_msg_size);
-  message[current_msg_size - 1] = '\0';
-  // printf(message, MAX_PAYLOAD, "%d", counter);
-  counter++;
-  return message;
+static uint64_t c_total_ops = 1e6;
+
+static uint64_t counter = 0; // static to retain value between calls
+
+static size_t max_buffer_size() {
+  return (sizeof(get_cmt_msg_t) > sizeof(recv_cmt_msg_t))? \
+    sizeof(get_cmt_msg_t) : sizeof(recv_cmt_msg_t);
 }
 
 int main(int argc, char **argv) {
@@ -33,18 +29,23 @@ int main(int argc, char **argv) {
   struct iovec iov;
   int rc;
 
-  if (argc > 1) {
-    current_msg_size = atoi(argv[1]);
-    if (current_msg_size <= 0 || current_msg_size > MAX_PAYLOAD) {
-      fprintf(stderr, "Invalid message size. Using default %d bytes.\n",
-              MAX_PAYLOAD);
-      current_msg_size = MAX_PAYLOAD;
-    }
+ 
+  if (argc == 1) {
+    fprintf(stderr, "Usage: %s <poolname> [<total_ops>]\n", argv[0]);
+    return 1;
+  }
+  const char* poolname = argv[1];
+  printf("poolname: %s\n", poolname);
+  if (argc > 2) {
+    c_total_ops = atoi(argv[1]);
+    printf("total operations: %lu\n", c_total_ops);
   }
 
-  int sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TEST);
+  int sock_fd = socket(PF_NETLINK, SOCK_RAW, GET_CMTS_SOCK);
   if (sock_fd < 0) {
-    printf("socket: %s\n", strerror(errno));
+    printf("error creating the socket of type=%s, errno: %s\n", \
+    get_socket_type(NOTIFY_CMTS_SOCK), \
+    strerror(errno));
     return 1;
   }
 
@@ -55,13 +56,11 @@ int main(int argc, char **argv) {
   bind(sock_fd, (struct sockaddr *)&src_addr, sizeof(src_addr));
 
   struct timespec start, end;
-  long long elapsed_ns;
 
-  // Get start time
+  // get start time
   clock_gettime(CLOCK_MONOTONIC, &start);
-  char *my_msg;
   for (;;) {
-    if (counter == TOTAL_OPS) {
+    if (counter == c_total_ops) {
       break;
     }
     memset(&dest_addr, 0, sizeof(dest_addr));
@@ -69,16 +68,16 @@ int main(int argc, char **argv) {
     dest_addr.nl_pid = 0;    /* For Linux Kernel */
     dest_addr.nl_groups = 0; /* unicast */
 
-    nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
+    nlh = (struct nlmsghdr*) malloc(NLMSG_SPACE(max_buffer_size()));
 
-    /* Fill the netlink message header */
-    nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
+    /* fill the netlink message header */
+    nlh->nlmsg_len = NLMSG_SPACE(max_buffer_size());
     nlh->nlmsg_pid = getpid(); /* self pid */
     nlh->nlmsg_flags = 0;
 
-    my_msg = get_message();
-    /* Fill in the netlink message payload */
-    strcpy(NLMSG_DATA(nlh), my_msg);
+    char* tx_msg = serialize_get_cmt_into_char(poolname);
+    /* fill in the netlink message payload */
+    memcpy(NLMSG_DATA(nlh), tx_msg, sizeof(get_cmt_msg_t));
 
     memset(&iov, 0, sizeof(iov));
     iov.iov_base = (void *)nlh;
@@ -90,17 +89,17 @@ int main(int argc, char **argv) {
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
 
-    //printf("Send to kernel: %s\n", my_msg);
-
+    printf("send to kernel: {%s, %dB}\n", poolname, nlh->nlmsg_len);
+    free(tx_msg);
     rc = sendmsg(sock_fd, &msg, 0);
     if (rc < 0) {
-      printf("sendmsg(): %s\n", strerror(errno));
+      printf("error seding the message: %s\n", strerror(errno));
       close(sock_fd);
       return 1;
     }
 
-    /* Read message from kernel */
-    memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
+    /* read message from kernel */
+    memset(nlh, 0, NLMSG_SPACE(max_buffer_size()));
 
     rc = recvmsg(sock_fd, &msg, 0);
     if (rc < 0) {
@@ -108,26 +107,26 @@ int main(int argc, char **argv) {
       close(sock_fd);
       return 1;
     }
-    if (memcmp(NLMSG_DATA(nlh), my_msg, strlen(my_msg)) != 0) {
-      printf("Received message does not match sent message.\n");
-      return 1;
-    }
-    // printf("Received from kernel: %s\n", NLMSG_DATA(nlh));
+
+    recv_cmt_msg_t* recv_msg = deserialze_recv_cmt(NLMSG_DATA(nlh));
+
+    printf("received from kernel: {blk_id=%ld, %s, cmt=%s}\n", \
+      recv_msg->blk_id, recv_msg->poolname, recv_msg->tail_commitment);
     free(nlh);
   }
 
-  // Get end time
+  // get end time
   clock_gettime(CLOCK_MONOTONIC, &end);
 
-  // Calculate elapsed time in seconds
-  elapsed_ns =
+  // calculate elapsed time in seconds
+  long long elapsed_ns =
       (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
-  double latency_us = (elapsed_ns / 1e3) / TOTAL_OPS; // Convert to microseconds
-  printf("Elapsed time: %llu  nanoseconds (latency per operation = %f us), "
+  double latency_us = (elapsed_ns / 1e3) / c_total_ops; // convert to microseconds
+  printf("elapsed time: %llu  nanoseconds (latency per operation = %f us), "
          "msg_size=%lu\n",
-         elapsed_ns, latency_us, strlen(my_msg));
+         elapsed_ns, latency_us, max_buffer_size());
 
-  /* Close Netlink Socket */
+  /* close Netlink Socket */
   close(sock_fd);
 
   return 0;

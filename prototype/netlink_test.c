@@ -2,51 +2,41 @@
 #include <linux/netlink.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include "config.h"
 
-#define NOTIFY_CMTS 31
-#define NETLINK_TEST 17
 
-//static struct task_struct *kth_arr;
+
 int thread_id = 0;
 
-struct sock *nl_sock = NULL;
+struct sock *nl_sock_get_cmts = NULL;
 struct sock *nl_sock_notify = NULL;
 
 
 static void notify_cmts(struct sk_buff *skb) {
-  struct nlmsghdr *nlh;
-  int msg_size;
-  char *msg;
-  int pid;
- 
-
-  nlh = (struct nlmsghdr *)skb->data;
-  pid = nlh->nlmsg_pid; /* pid of sending process */
-  msg = (char *)nlmsg_data(nlh);
-  msg_size = nlh->nlmsg_len;
-  int blk_id = 0;
-  memcpy(&blk_id, msg, sizeof(int));
-  printk(KERN_INFO "notify_cmts: Received from pid %d: [thread_id:%d] about blk_id=%d\n", pid, current->pid, blk_id);
-
+  struct nlmsghdr* nlh = (struct nlmsghdr *)skb->data;
+  int pid = nlh->nlmsg_pid; /* pid of sending process */
+  char* msg = (char*) nlmsg_data(nlh);
+  int msg_size = nlh->nlmsg_len;
+  uint64_t blk_id = 0;
+  memcpy(&blk_id, msg, sizeof(uint64_t));
+  printk(KERN_INFO "notify_cmts: received from pid=%d and \
+    thread_id=%d notification about blk_id=%ld\n", pid, current->pid, blk_id);
 }
 
-static void netlink_test_recv_msg(struct sk_buff *skb) {
+static void get_cmts(struct sk_buff *skb) {
   struct sk_buff *skb_out;
-  struct nlmsghdr *nlh;
-  int msg_size;
-  char *msg;
-  int pid;
+  
   int res;
 
-  nlh = (struct nlmsghdr *)skb->data;
-  pid = nlh->nlmsg_pid; /* pid of sending process */
-  msg = (char *)nlmsg_data(nlh);
-  msg_size = strlen(msg);
+  struct nlmsghdr* nlh = (struct nlmsghdr *)skb->data;
+  int pid = nlh->nlmsg_pid; /* pid of sending process */
+  char* msg = (char*) nlmsg_data(nlh);
+  int msg_size = nlh->nlmsg_len;
  
   // create reply
   skb_out = nlmsg_new(msg_size, 0);
   if (!skb_out) {
-    printk(KERN_ERR "netlink_test: Failed to allocate new skb\n");
+    printk(KERN_ERR "get_cmts: failed to allocate new skb\n");
     return;
   }
 
@@ -55,37 +45,37 @@ static void netlink_test_recv_msg(struct sk_buff *skb) {
   NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
   strncpy(nlmsg_data(nlh), msg, msg_size);
 
-  printk(KERN_INFO "netlink_test_recv_msg: Send %s\n", msg);
+  printk(KERN_INFO "get_cmts: send %s\n", msg);
 
-  res = nlmsg_unicast(nl_sock, skb_out, pid);
+  res = nlmsg_unicast(nl_sock_get_cmts, skb_out, pid);
   if (res < 0)
-    printk(KERN_INFO "netlink_test: Error while sending skb to user\n");
+    printk(KERN_INFO "get_cmts: error while sending skb to user\n");
 }
 
 
 
-static int __init netlink_test_init(void) {
-  printk(KERN_INFO "netlink_test: Init module %d\n", current->pid);
+static int __init netlink_module_init(void) {
+  printk(KERN_INFO "netlink_module: init module from pid=%d\n", current->pid);
 
 
-  struct netlink_kernel_cfg cfg = {
-      .input = netlink_test_recv_msg,
+  struct netlink_kernel_cfg cfg_get_cmts = {
+      .input = get_cmts,
   };
 
   
-  nl_sock = netlink_kernel_create(&init_net, NETLINK_TEST, &cfg);
-  if (!nl_sock) {
-    printk(KERN_ALERT "netlink_test: Error creating NETLINK_TEST socket.\n");
+  nl_sock_get_cmts = netlink_kernel_create(&init_net, GET_CMTS_SOCK, &cfg_get_cmts);
+  if (!nl_sock_get_cmts) {
+    printk(KERN_ALERT "netlink_module: error creating NETLINK_TEST socket.\n");
     return -10;
   }
 
   #if 1
-  struct netlink_kernel_cfg cfg_notify = {
+  struct netlink_kernel_cfg cfg_notify_cmts = {
       .input = notify_cmts,
   };
-  nl_sock_notify = netlink_kernel_create(&init_net, NOTIFY_CMTS, &cfg_notify);
+  nl_sock_notify = netlink_kernel_create(&init_net, NOTIFY_CMTS_SOCK, &cfg_notify_cmts);
   if (!nl_sock_notify) {
-    printk(KERN_ALERT "netlink_test: Error creating NOTIFY_CMTS socket.\n");
+    printk(KERN_ALERT "netlink_module: error creating NOTIFY_CMTS_SOCK socket.\n");
     return -10;
   }
   #endif
@@ -94,19 +84,18 @@ static int __init netlink_test_init(void) {
   return 0;
 }
 
-static void __exit netlink_test_exit(void) {
-  printk(KERN_INFO "netlink_test: Exit module\n");
-  printk(KERN_INFO "exiting thread module\n");
-  if (nl_sock)
-    netlink_kernel_release(nl_sock);
+static void __exit netlink_module_exit(void) {
+  printk(KERN_INFO "netlink_module: exit module\n");
+  if (nl_sock_get_cmts)
+    netlink_kernel_release(nl_sock_get_cmts);
   if (nl_sock_notify)
     netlink_kernel_release(nl_sock_notify);
 
   
-  printk(KERN_INFO "stopped the threads\n");
+  printk(KERN_INFO "netlink_module: sockets closed\n");
 }
 
-module_init(netlink_test_init);
-module_exit(netlink_test_exit);
+module_init(netlink_module_init);
+module_exit(netlink_module_exit);
 
 MODULE_LICENSE("GPL");
