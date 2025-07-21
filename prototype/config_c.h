@@ -12,7 +12,7 @@
 
 // ---- helpers ----
 
-static char* get_socket_type(const int socket_type) {
+static const char* get_socket_type(const int socket_type) {
     switch (socket_type) {
         case NOTIFY_CMTS_SOCK:
             return "NOTIFY_CMTS_SOCK";

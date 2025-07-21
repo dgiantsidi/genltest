@@ -22,8 +22,7 @@ static size_t max_buffer_size() {
 }
 
 int main(int argc, char **argv) {
-  struct sockaddr_nl src_addr;
-  struct sockaddr_nl dest_addr;
+  struct sockaddr_nl src_addr, dest_addr;
   struct nlmsghdr *nlh;
   struct msghdr msg;
   struct iovec iov;
