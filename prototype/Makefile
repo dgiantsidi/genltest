@@ -1,5 +1,5 @@
 KERNEL_DIR=/usr/src/kernel-headers-$(shell uname -r)
-obj-m += netlink_test.o
+obj-m += netlink_module.o
 ccflags-y := -std=gnu99 -O3 -Wno-declaration-after-statement
 
 all: 

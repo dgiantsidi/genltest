@@ -20,14 +20,14 @@ static void notify_cmts(struct sk_buff *skb) {
   uint64_t blk_id = 0;
   memcpy(&blk_id, msg, sizeof(uint64_t));
   printk(KERN_INFO "notify_cmts: received from pid=%d and \
-    thread_id=%d notification about blk_id=%ld\n", pid, current->pid, blk_id);
+    thread_id=%d notification about blk_id=%lld \
+    (msg size=%d and payload_sz=%d)\n", \
+    pid, current->pid, blk_id, msg_size, (msg_size-NLMSG_HDRLEN));
 }
 
 static void get_cmts(struct sk_buff *skb) {
   struct sk_buff *skb_out;
   
-  int res;
-
   struct nlmsghdr* nlh = (struct nlmsghdr *)skb->data;
   int pid = nlh->nlmsg_pid; /* pid of sending process */
   char* msg = (char*) nlmsg_data(nlh);
@@ -47,7 +47,7 @@ static void get_cmts(struct sk_buff *skb) {
 
   printk(KERN_INFO "get_cmts: send %s\n", msg);
 
-  res = nlmsg_unicast(nl_sock_get_cmts, skb_out, pid);
+  int res = nlmsg_unicast(nl_sock_get_cmts, skb_out, pid);
   if (res < 0)
     printk(KERN_INFO "get_cmts: error while sending skb to user\n");
 }
