@@ -12,5 +12,5 @@ all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 clean:
-	rm -f notify_cmts user_space_proc user_space_proc_cpp memcpy_test get_cmts
+	rm -f notify_cmts user_space_proc user_space_proc_cpp memcpy_test get_cmts output.txt
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
