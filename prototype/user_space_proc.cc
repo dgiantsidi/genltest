@@ -10,6 +10,9 @@
 #include <errno.h>
 #include "config_c.h"
 #include "msg_processing_functions.h"
+#include "fifo_queue.hpp"
+
+fifo_queue<recv_cmt_msg_t*> recv_queue; // queue to store received messages
 
 static void* notify_cmts(void* arg_poolname) {
   struct sockaddr_nl src_addr, dest_addr;
@@ -55,8 +58,11 @@ static void* notify_cmts(void* arg_poolname) {
     nlh->nlmsg_pid = getpid(); /* self pid */
     nlh->nlmsg_flags = 0;
 
-    char* tx_msg = serialize_notify_cmt_into_char(poolname, counter);
-
+    recv_cmt_msg_t* last_cmt = recv_queue.pop();
+    char* tx_msg = serialize_notify_cmt_into_char(last_cmt->poolname, last_cmt->blk_id);
+    uint64_t last_blk_id = last_cmt->blk_id;
+    free(last_cmt); 
+    
     /* fill in the netlink message payload */
     memcpy(NLMSG_DATA(nlh), tx_msg, sizeof(notify_cmt_msg_t));
 
@@ -83,6 +89,7 @@ static void* notify_cmts(void* arg_poolname) {
    
     free(nlh);
     free(tx_msg);
+    std::vector<recv_cmt_msg_t*> to_be_deleted = recv_queue.pop_until_blk_id(last_blk_id);
     counter++;
   }
 
@@ -192,6 +199,7 @@ static void* get_cmts(void* arg_poolname) {
         recv_msg->blk_id, expected_blk_id);
         exit(0);
     }
+    recv_queue.push(recv_msg); // push the received message to the queue
     printf("received from kernel: {blk_id=%ld, %s, cmt=%s}\n", \
       recv_msg->blk_id, recv_msg->poolname, recv_msg->tail_commitment);
     free(nlh);
