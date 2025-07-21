@@ -6,7 +6,7 @@ CXX_FLAGS := -O3 -Wno-declaration-after-statement -fsanitize=address -g -Wall -W
 all: 
 	$(CC)  $(CXX_FLAGS) notify_cmts.c -o notify_cmts
 	$(CC)  $(CXX_FLAGS)  user_space_proc.c -o user_space_proc
-	$(CXX) $(CXX_FLAGS) user_space_proc.cc -o user_space_proc_cpp
+	$(CXX) $(CXX_FLAGS) user_space_proc.cc -o user_space_proc_cpp -fsanitize=address
 	$(CC) $(CXX_FLAGS) memcpy_test.c -o memcpy_test
 	$(CC) $(CXX_FLAGS) get_cmts.c -o get_cmts
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules

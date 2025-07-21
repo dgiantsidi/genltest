@@ -1,37 +1,41 @@
 #include "config.h"
 #include <vector>
 #include <mutex>
-#include <queue>
+//#include <queue>
+#include <stack>
 
 template <typename T>
 class fifo_queue {
-    std::queue<T> queue;
+//    std::queue<T> queue;
+    
+    std::stack<T> lifo;
+
     std::mutex mtx;
     public:
         fifo_queue() = default;
 
         ~fifo_queue() {
-            if (queue.size() > 0) {
+            if (lifo.size() > 0) {
                 printf("fifo_queue: destructor called, but queue is not empty, size=%lu\n",\
-                     queue.size());
+                     lifo.size());
             }
         } 
         
         void push(T msg) {
             std::lock_guard<std::mutex> lock(mtx);
-            queue.push(msg);
+            lifo.push(msg);
         }
 
         bool empty() {
             std::lock_guard<std::mutex> lock(mtx);
-            return queue.empty();
+            return lifo.empty();
         }
 
         T pop() {
             std::lock_guard<std::mutex> lock(mtx);
-            if (!queue.empty()) {
-                T msg = queue.front();
-                queue.pop();
+            if (!lifo.empty()) {
+                T msg = lifo.top();
+                lifo.pop();
                 return msg;
             }
             return nullptr;
@@ -40,11 +44,11 @@ class fifo_queue {
         std::vector<T> pop_until_blk_id(uint64_t blk_id) {
             std::vector<T> ret_vec;
             std::lock_guard<std::mutex> lock(mtx);
-            while (!queue.empty()) {
-                T msg = queue.front();
+            while (!lifo.empty()) {
+                T msg = lifo.top();
                 if (msg->blk_id <= blk_id) {
                     ret_vec.emplace_back(msg);
-                    queue.pop();
+                    lifo.pop();
                 }
                 else {
                     return ret_vec;

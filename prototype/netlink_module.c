@@ -10,7 +10,6 @@ int thread_id = 0;
 struct sock *nl_sock_get_cmts = NULL;
 struct sock *nl_sock_notify = NULL;
 static int global_counter = 0;
-static int expected_acked_blk_id = 0;
 
 
 static char* serialize_recv_cmt(char* recv_msg, \
@@ -40,12 +39,6 @@ static void notify_cmts(struct sk_buff *skb) {
     about blk_id=%lld \
     (msg size=%d and payload_sz=%d)\n", \
     current->pid, pid, blk_id, msg_size, (msg_size-NLMSG_HDRLEN));
-    if (blk_id != expected_acked_blk_id) {
-      printk(KERN_ERR "notify_cmts: received unexpected blk_id=%lld, expected=%d\n", \
-        blk_id, expected_acked_blk_id);
-      return;
-    }
-  expected_acked_blk_id++;
 }
 
 static void get_cmts(struct sk_buff *skb) {
@@ -69,7 +62,8 @@ static void get_cmts(struct sk_buff *skb) {
   char* to_be_copied = serialize_recv_cmt(nlmsg_data(nlh), msg, global_counter, msg);
   memcpy(nlmsg_data(nlh), to_be_copied, get_size_of_recv_cmt());
 
-  printk(KERN_INFO "get_cmts (current pid=%d) receveived notification from pid=%d and sends back %s\n", current->pid, pid, msg);
+  printk(KERN_INFO "get_cmts (current pid=%d) received notification\
+     from pid=%d and sends back %d\n", current->pid, pid, global_counter);
 
   int res = nlmsg_unicast(nl_sock_get_cmts, skb_out, pid);
   if (res < 0)

@@ -15,14 +15,15 @@
 
 fifo_queue<recv_cmt_msg_t*> recv_queue; // queue to store received messages
 std::atomic<int> get_thread_done(false);  
+static uint64_t c_total_ops = 10e6;
 
 static void* notify_cmts(void* arg_poolname) {
   struct sockaddr_nl src_addr, dest_addr;
-  static uint64_t c_total_ops = 1e6;
-  static uint64_t counter = 0; 
+  static uint64_t last_acked_blk_id = 0; 
   struct msghdr msg;
   struct iovec iov;
   const char* poolname = (const char*)arg_poolname;
+  uint64_t total_ops = 0;
   
   // create socket for sending notify messages
   int sock_fd = socket(PF_NETLINK, SOCK_RAW, NOTIFY_CMTS_SOCK);
@@ -46,6 +47,7 @@ static void* notify_cmts(void* arg_poolname) {
   clock_gettime(CLOCK_MONOTONIC, &start);
   for (;;) {
     if (get_thread_done.load() && recv_queue.empty()) {
+      printf("notify_cmts: get_thread_done is true and recv_queue is empty, exiting...\n");
       break;
     }
 
@@ -54,6 +56,15 @@ static void* notify_cmts(void* arg_poolname) {
     dest_addr.nl_pid = 0;    /* For Linux Kernel */
     dest_addr.nl_groups = 0; /* unicast */
 
+    randomized_sleeps();
+    recv_cmt_msg_t* last_cmt = recv_queue.pop();
+    while ((last_cmt == nullptr) && (last_acked_blk_id < (c_total_ops -1))) {
+      last_cmt = recv_queue.pop();
+    }
+    if (last_acked_blk_id == (c_total_ops -1)) {
+     break;
+    }
+
     struct nlmsghdr *nlh = (struct nlmsghdr*) malloc(NLMSG_SPACE(sizeof(notify_cmt_msg_t)));
 
     /* fill the netlink message header */
@@ -61,11 +72,7 @@ static void* notify_cmts(void* arg_poolname) {
     nlh->nlmsg_pid = getpid(); /* self pid */
     nlh->nlmsg_flags = 0;
 
-    randomized_sleeps();
-    recv_cmt_msg_t* last_cmt = recv_queue.pop();
-    while (last_cmt == nullptr) {
-      last_cmt = recv_queue.pop();
-    }
+    
       
     char* tx_msg = serialize_notify_cmt_into_char(last_cmt->poolname, last_cmt->blk_id);
     uint64_t last_blk_id = last_cmt->blk_id;
@@ -86,21 +93,26 @@ static void* notify_cmts(void* arg_poolname) {
 
     uint64_t blk_id = 0;
     memcpy(&blk_id, tx_msg, sizeof(uint64_t));
-    printf("send to kernel: {%ld, %dB}\n", blk_id, nlh->nlmsg_len);
-
+    #ifdef PRINT
+    printf("%s send to kernel: {%ld, %dB}\n", __func__, blk_id, nlh->nlmsg_len);
+    #endif
     int rc = sendmsg(sock_fd, &msg, 0);
     if (rc < 0) {
       printf("error seding the message: %s\n", strerror(errno));
       close(sock_fd);
       return NULL;
     }
-   
+    total_ops++;
     free(nlh);
     free(tx_msg);
+    last_acked_blk_id = last_blk_id;
     std::vector<recv_cmt_msg_t*> to_be_deleted = recv_queue.pop_until_blk_id(last_blk_id);
+    //printf("delete about %d entries from the queue with last_blk_id=%ld\n", to_be_deleted.size(), last_blk_id);
     for (auto& buf : to_be_deleted) {
       free(buf); // free the messages that were popped from the queue
     }
+    //printf("done with deletion \n", to_be_deleted.size());
+
   }
 
   // get end time
@@ -109,10 +121,10 @@ static void* notify_cmts(void* arg_poolname) {
   // calculate elapsed time in seconds
   long long elapsed_ns =
       (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
-  double latency_us = (elapsed_ns / 1e3) / c_total_ops; // convert to microseconds
-  printf("elapsed time: %llu  nanoseconds (latency per operation = %f us), "
+  double latency_us = (elapsed_ns / 1e3) / total_ops; // convert to microseconds
+  printf("elapsed time: %llu  nanoseconds (latency per operation = %f us, total_ops=%llu), "
          "msg_size=%lu\n",
-         elapsed_ns, latency_us, sizeof(notify_cmt_msg_t));
+         elapsed_ns, latency_us, total_ops, sizeof(notify_cmt_msg_t));
 
   /* close Netlink Socket */
   close(sock_fd);
@@ -128,7 +140,6 @@ static size_t max_buffer_size() {
 
 
 static void* get_cmts(void* arg_poolname) {
-  static uint64_t c_total_ops = 1e6;
   const char* poolname = (const char*)arg_poolname;
   static uint64_t expected_blk_id = 0; // static to retain value between calls
   struct sockaddr_nl src_addr, dest_addr;
@@ -185,7 +196,9 @@ static void* get_cmts(void* arg_poolname) {
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
 
-    printf("send to kernel: {%s, %dB}\n", poolname, nlh->nlmsg_len);
+    #ifdef PRINT
+    printf("%s send to kernel: {%s, %dB}\n", __func__, poolname, nlh->nlmsg_len);
+    #endif
     free(tx_msg);
     int rc = sendmsg(sock_fd, &msg, 0);
     if (rc < 0) {
@@ -210,9 +223,13 @@ static void* get_cmts(void* arg_poolname) {
         recv_msg->blk_id, expected_blk_id);
         exit(0);
     }
-    recv_queue.push(recv_msg); // push the received message to the queue
+    #ifdef PRINT
     printf("received from kernel: {blk_id=%ld, %s, cmt=%s}\n", \
       recv_msg->blk_id, recv_msg->poolname, recv_msg->tail_commitment);
+    #endif
+
+    recv_queue.push(recv_msg); // push the received message to the queue
+
     free(nlh);
     expected_blk_id++;
   }
