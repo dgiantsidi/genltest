@@ -1,4 +1,5 @@
 #pragma once
+#include "_attributes.h"
 #include "config.h"
 
 MAYBE_UNUSED static char *
