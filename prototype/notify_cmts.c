@@ -14,11 +14,10 @@ static uint64_t c_total_ops = 1e6;
 
 static uint64_t counter = 0; // static to retain value between calls
 
-
 int main(int argc, char **argv) {
   struct sockaddr_nl src_addr;
   struct sockaddr_nl dest_addr;
-  
+
   struct msghdr msg;
   struct iovec iov;
   int rc;
@@ -27,19 +26,18 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Usage: %s <poolname> [<total_ops>]\n", argv[0]);
     return 1;
   }
-  const char* poolname = argv[1];
+  const char *poolname = argv[1];
   printf("poolname: %s\n", poolname);
   if (argc > 2) {
     c_total_ops = atoi(argv[1]);
     printf("total operations: %lu\n", c_total_ops);
   }
-  
+
   // create socket for sending notify messages
   int sock_fd = socket(PF_NETLINK, SOCK_RAW, NOTIFY_CMTS_SOCK);
   if (sock_fd < 0) {
-    printf("error creating the socket of type=%s, errno: %s\n", \
-      get_socket_type(NOTIFY_CMTS_SOCK), \
-      strerror(errno));
+    printf("error creating the socket of type=%s, errno: %s\n",
+           get_socket_type(NOTIFY_CMTS_SOCK), strerror(errno));
     return 1;
   }
 
@@ -50,7 +48,6 @@ int main(int argc, char **argv) {
   bind(sock_fd, (struct sockaddr *)&src_addr, sizeof(src_addr));
 
   struct timespec start, end;
-  
 
   // get start time
   clock_gettime(CLOCK_MONOTONIC, &start);
@@ -63,14 +60,15 @@ int main(int argc, char **argv) {
     dest_addr.nl_pid = 0;    /* For Linux Kernel */
     dest_addr.nl_groups = 0; /* unicast */
 
-    struct nlmsghdr *nlh = (struct nlmsghdr*) malloc(NLMSG_SPACE(sizeof(notify_cmt_msg_t)));
+    struct nlmsghdr *nlh =
+        (struct nlmsghdr *)malloc(NLMSG_SPACE(sizeof(notify_cmt_msg_t)));
 
     /* fill the netlink message header */
     nlh->nlmsg_len = NLMSG_SPACE(sizeof(notify_cmt_msg_t));
     nlh->nlmsg_pid = getpid(); /* self pid */
     nlh->nlmsg_flags = 0;
 
-    char* tx_msg = serialize_notify_cmt_into_char(poolname, counter);
+    char *tx_msg = serialize_notify_cmt_into_char(poolname, counter);
 
     /* fill in the netlink message payload */
     memcpy(NLMSG_DATA(nlh), tx_msg, sizeof(notify_cmt_msg_t));
@@ -95,7 +93,7 @@ int main(int argc, char **argv) {
       close(sock_fd);
       return 1;
     }
-   
+
     free(nlh);
     free(tx_msg);
     counter++;
@@ -107,7 +105,8 @@ int main(int argc, char **argv) {
   // calculate elapsed time in seconds
   long long elapsed_ns =
       (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
-  double latency_us = (elapsed_ns / 1e3) / c_total_ops; // convert to microseconds
+  double latency_us =
+      (elapsed_ns / 1e3) / c_total_ops; // convert to microseconds
   printf("elapsed time: %llu  nanoseconds (latency per operation = %f us), "
          "msg_size=%lu\n",
          elapsed_ns, latency_us, sizeof(notify_cmt_msg_t));

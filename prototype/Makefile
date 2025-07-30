@@ -1,7 +1,7 @@
 KERNEL_DIR=/usr/src/kernel-headers-$(shell uname -r)
 obj-m += netlink_module.o
 ccflags-y := -std=gnu99 -O3 -Wno-declaration-after-statement
-CXX_FLAGS := -O3 -Wno-declaration-after-statement -fsanitize=address -g -Wall -Wextra -pthread
+CXX_FLAGS := -O3 -Wno-declaration-after-statement -fsanitize=address -g -Wall -Wextra -pthread  
 
 all: 
 	$(CC)  $(CXX_FLAGS) notify_cmts.c -o notify_cmts
