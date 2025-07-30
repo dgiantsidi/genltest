@@ -11,14 +11,14 @@
 
 #include "msg_processing_functions.h"
 
-
 static uint64_t c_total_ops = 1e6;
 
 static uint64_t counter = 0; // static to retain value between calls
 
 static size_t max_buffer_size() {
-  return (sizeof(get_cmt_msg_t) > sizeof(recv_cmt_msg_t))? \
-    sizeof(get_cmt_msg_t) : sizeof(recv_cmt_msg_t);
+  return (sizeof(get_cmt_msg_t) > sizeof(recv_cmt_msg_t))
+             ? sizeof(get_cmt_msg_t)
+             : sizeof(recv_cmt_msg_t);
 }
 
 int main(int argc, char **argv) {
@@ -28,12 +28,11 @@ int main(int argc, char **argv) {
   struct iovec iov;
   int rc;
 
- 
   if (argc == 1) {
     fprintf(stderr, "Usage: %s <poolname> [<total_ops>]\n", argv[0]);
     return 1;
   }
-  const char* poolname = argv[1];
+  const char *poolname = argv[1];
   printf("poolname: %s\n", poolname);
   if (argc > 2) {
     c_total_ops = atoi(argv[1]);
@@ -42,9 +41,8 @@ int main(int argc, char **argv) {
 
   int sock_fd = socket(PF_NETLINK, SOCK_RAW, GET_CMTS_SOCK);
   if (sock_fd < 0) {
-    printf("error creating the socket of type=%s, errno: %s\n", \
-    get_socket_type(NOTIFY_CMTS_SOCK), \
-    strerror(errno));
+    printf("error creating the socket of type=%s, errno: %s\n",
+           get_socket_type(NOTIFY_CMTS_SOCK), strerror(errno));
     return 1;
   }
 
@@ -67,14 +65,14 @@ int main(int argc, char **argv) {
     dest_addr.nl_pid = 0;    /* For Linux Kernel */
     dest_addr.nl_groups = 0; /* unicast */
 
-    nlh = (struct nlmsghdr*) malloc(NLMSG_SPACE(max_buffer_size()));
+    nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(max_buffer_size()));
 
     /* fill the netlink message header */
     nlh->nlmsg_len = NLMSG_SPACE(max_buffer_size());
     nlh->nlmsg_pid = getpid(); /* self pid */
     nlh->nlmsg_flags = 0;
 
-    char* tx_msg = serialize_get_cmt_into_char(poolname);
+    char *tx_msg = serialize_get_cmt_into_char(poolname);
     /* fill in the netlink message payload */
     memcpy(NLMSG_DATA(nlh), tx_msg, sizeof(get_cmt_msg_t));
 
@@ -107,10 +105,10 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-    recv_cmt_msg_t* recv_msg = deserialize_recv_cmt(NLMSG_DATA(nlh));
+    recv_cmt_msg_t *recv_msg = deserialize_recv_cmt(NLMSG_DATA(nlh));
 
-    printf("received from kernel: {blk_id=%ld, %s, cmt=%s}\n", \
-      recv_msg->blk_id, recv_msg->poolname, recv_msg->tail_commitment);
+    printf("received from kernel: {blk_id=%ld, %s, cmt=%s}\n", recv_msg->blk_id,
+           recv_msg->poolname, recv_msg->tail_commitment);
     free(nlh);
   }
 
@@ -120,7 +118,8 @@ int main(int argc, char **argv) {
   // calculate elapsed time in seconds
   long long elapsed_ns =
       (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
-  double latency_us = (elapsed_ns / 1e3) / c_total_ops; // convert to microseconds
+  double latency_us =
+      (elapsed_ns / 1e3) / c_total_ops; // convert to microseconds
   printf("elapsed time: %llu  nanoseconds (latency per operation = %f us), "
          "msg_size=%lu\n",
          elapsed_ns, latency_us, max_buffer_size());

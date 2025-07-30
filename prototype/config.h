@@ -1,6 +1,5 @@
 #pragma once
 
-
 // netlink sockets definitions
 #define NOTIFY_CMTS_SOCK 31
 #define GET_CMTS_SOCK 17
@@ -8,8 +7,7 @@
 // ---- messages definitions ----
 
 #define ZFS_MAX_DATASET_NAME_LEN 256
-#define COMMITMENT_SIZE 32 
-
+#define COMMITMENT_SIZE 32
 
 // message sent to kernel for acked cmt/pool notification
 typedef struct notify_cmt_msg {
@@ -26,6 +24,6 @@ typedef struct get_cmt_msg {
 typedef struct recv_cmt_msg {
   uint64_t blk_id; // block id
   char poolname[ZFS_MAX_DATASET_NAME_LEN];
-  char tail_commitment[COMMITMENT_SIZE]; 
+  char tail_commitment[COMMITMENT_SIZE];
   // todo: extend w/ uberblock and zil header commitments
 } recv_cmt_msg_t;
