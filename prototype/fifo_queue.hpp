@@ -36,7 +36,7 @@ class fifo_queue {
             if (!lifo.empty()) {
                 T msg = lifo.top();
                 lifo.pop();
-                last_blk_id = msg->blk_id; // update the last processed block id
+                last_blk_id = (last_blk_id > msg->blk_id) ? last_blk_id : msg->blk_id; // update the last processed block id
                 return msg;
             }
             return nullptr;
