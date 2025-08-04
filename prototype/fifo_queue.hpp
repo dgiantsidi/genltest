@@ -51,8 +51,10 @@ public:
       T msg = lifo.top();
       if (msg->blk_id > last_blk_id) {
         last_blk_id = msg->blk_id; // update the last processed block id
+        #if 0
         std::cout << __PRETTY_FUNCTION__ << ": last_blk_id=" << last_blk_id
                   << std::endl;
+        #endif
         return true;
       }
     }
