@@ -8,3 +8,9 @@ compile_commands.json
 *.symvers
 *.order
 us/genltest
+*/get_cmts
+*/memcpy_test
+*/notify_cmts
+*/*.log
+*/user_space_proc
+*/user_space_proc_cpp
