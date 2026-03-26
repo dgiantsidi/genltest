@@ -3,6 +3,8 @@
 // netlink sockets definitions
 #define NOTIFY_CMTS_SOCK 31
 #define GET_CMTS_SOCK 17
+#define GET_UBCMTS_SOCK 23
+#define NOTIFY_UBCMTS_SOCK 24
 
 // ---- messages definitions ----
 
@@ -20,10 +22,15 @@ typedef struct get_cmt_msg {
   char poolname[ZFS_MAX_DATASET_NAME_LEN];
 } get_cmt_msg_t;
 
+enum block_type {
+  TAIL = 0,
+  UB = 1
+};
 // message received from kernel for new commitment
 typedef struct recv_cmt_msg {
   uint64_t blk_id; // block id
   char poolname[ZFS_MAX_DATASET_NAME_LEN];
   char tail_commitment[COMMITMENT_SIZE];
+  int blk_type;
   // todo: extend w/ uberblock and zil header commitments
 } recv_cmt_msg_t;

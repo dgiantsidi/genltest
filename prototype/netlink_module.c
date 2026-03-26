@@ -57,7 +57,7 @@ static void get_cmts(struct sk_buff *skb) {
   char *to_be_copied =
       serialize_recv_cmt(nlmsg_data(nlh), msg, global_counter, msg);
   memcpy(nlmsg_data(nlh), to_be_copied, get_size_of_recv_cmt());
-
+  usleep_range(1000, 2000);  // sleep between 100–200 µs
   printk(KERN_INFO "get_cmts (current pid=%d) received notification\
      from pid=%d and sends back %d\n",
          current->pid, pid, global_counter);
