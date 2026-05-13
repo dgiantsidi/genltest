@@ -10,6 +10,10 @@
 
 #define ZFS_MAX_DATASET_NAME_LEN 256
 #define COMMITMENT_SIZE 32
+// do not change this (from uberblock_impl.h) as it is used for serialization/deserialization of uberblocks cmts
+#define HEX_PER_UINT8 2
+#define UBERBLOCK_DIGEST_BUF_SIZE SHA256_DIGEST_LENGTH * HEX_PER_UINT8 + 1
+
 
 // message sent to kernel for acked cmt/pool notification
 typedef struct notify_cmt_msg {
@@ -32,5 +36,6 @@ typedef struct recv_cmt_msg {
   char poolname[ZFS_MAX_DATASET_NAME_LEN];
   char tail_commitment[COMMITMENT_SIZE];
   int blk_type;
-  // todo: extend w/ uberblock and zil header commitments
+  uint64_t zil_head_blk_id;
+  char ub_digest[UBERBLOCK_DIGEST_BUF_SIZE];
 } recv_cmt_msg_t;
