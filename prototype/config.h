@@ -28,7 +28,8 @@ typedef struct get_cmt_msg {
 
 enum block_type {
   TAIL = 0,
-  UB = 1
+  UB = 1,
+  REGISTRATION = 2
 };
 // message received from kernel for new commitment
 typedef struct recv_cmt_msg {
